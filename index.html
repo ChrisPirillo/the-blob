@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Inspired by https://www.threads.com/@dannystuart/post/DR-eZ8TjO2g -->
+
+    <!-- Primary SEO -->
+    <title>The Blob - Interactive 3D Fire Visualization</title>
+    <meta name="description" content="Experience 'The Blob', a real-time interactive 3D WebGL blobby fire simulation. Customize flame geometry, lighting, and colors in this immersive digital arcade experiment.">
+    <meta name="keywords" content="The Blob, interactive fire simulation, WebGL experiment, 3D visualization, blob, three.js fire, generative art">
+    <meta name="author" content="Chris Pirillo">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://pirillo.com/arcade/the-blob.html">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://pirillo.com/arcade/the-blob.html">
+    <meta property="og:title" content="The Blob - Interactive 3D Fire Visualization">
+    <meta property="og:description" content="Control the flames in this real-time 3D WebGL simulation.">
+    <meta property="og:image" content="https://pirillo.com/arcade/images/the-blob.png">
+    <meta property="og:site_name" content="Pirillo.com">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:site" content="@ChrisPirillo">
+    <meta name="twitter:creator" content="@ChrisPirillo">
+    <meta name="twitter:url" content="https://pirillo.com/arcade/the-blob.html">
+    <meta name="twitter:title" content="The Blob - Interactive 3D Fire Visualization">
+    <meta name="twitter:description" content="Experience the heat with this interactive 3D WebGL blob fire experiment.">
+    <meta name="twitter:image" content="https://pirillo.com/arcade/images/the-blob.png">
+
+    <!-- Performance Hints -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "The Blob",
+      "url": "https://pirillo.com/arcade/the-blob.html",
+      "description": "An interactive 3D WebGL fire simulation allowing users to customize flame geometry, lighting, and colors.",
+      "image": "https://pirillo.com/arcade/images/the-blob.png",
+      "genre": "Simulation",
+      "author": {
+        "@type": "Person",
+        "name": "Chris Pirillo",
+        "url": "https://pirillo.com"
+      },
+      "applicationCategory": "MultimediaApplication",
+      "operatingSystem": "Any"
+    }
+    </script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-1CQ4D3VQ3L"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-1CQ4D3VQ3L');
+    </script>
+
+    <style>
+        :root {
+            --bg-color: #050100;
+            --text-color: #e0e0e0;
+            --accent-color: #ff3300;
+            --panel-bg: rgba(20, 5, 0, 0.95); 
+            --panel-border: rgba(255, 100, 50, 0.2);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+        }
+
+        /* Dynamic Studio Backdrop */
+        #studio-backdrop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            background: radial-gradient(circle at 50% 60%, #3a1000 0%, #000000 80%);
+            transition: background 0.2s ease;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #fade-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: black;
+            z-index: 100;
+            pointer-events: none;
+            opacity: 1; 
+            transition: opacity 0.6s ease;
+        }
+
+        #menu-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 101;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #menu-btn span {
+            width: 30px;
+            height: 3px;
+            background-color: white;
+            border-radius: 2px;
+            transition: all 0.3s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.8);
+        }
+
+        #menu-btn.open span:nth-child(1) { transform: rotate(45deg) translate(6px, 6px); }
+        #menu-btn.open span:nth-child(2) { opacity: 0; }
+        #menu-btn.open span:nth-child(3) { transform: rotate(-45deg) translate(6px, -6px); }
+
+        #settings-panel {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 340px;
+            height: 100%;
+            background: var(--panel-bg);
+            border-left: 1px solid var(--panel-border);
+            z-index: 99;
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+            padding: 80px 24px 40px 24px;
+            box-sizing: border-box;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            box-shadow: -5px 0 30px rgba(0,0,0,0.8);
+        }
+
+        #settings-panel.open {
+            transform: translateX(0);
+        }
+
+        h2 {
+            margin: 0;
+            font-weight: 800;
+            letter-spacing: 1px;
+            font-size: 20px;
+            color: white;
+            border-bottom: 1px solid rgba(255,100,0,0.3);
+            padding-bottom: 12px;
+        }
+
+        .section-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--accent-color);
+            letter-spacing: 1px;
+            font-weight: 700;
+            margin-top: 5px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #ccc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 2px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #ffaa55;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.1s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.1); background: var(--accent-color); }
+
+        .color-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            width: 100%;
+            height: 35px;
+            border-radius: 4px;
+            cursor: pointer;
+            background: none;
+            padding: 0;
+        }
+        
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch { border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; }
+
+        .btn-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 10px;
+        }
+        
+        button:hover { background: rgba(255,255,255,0.2); }
+        .full-width { grid-column: span 2; background: var(--accent-color); border: none; }
+        .full-width:hover { background: #ff5500; }
+
+        #click-trigger {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 50;
+        }
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js",
+                "three/examples/": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <!-- Backdrop for Ambient Light -->
+    <div id="studio-backdrop"></div>
+    
+    <!-- Semantic Main for Canvas -->
+    <main id="canvas-container"></main>
+    <div id="click-trigger"></div>
+    <div id="fade-overlay"></div>
+
+    <!-- Interactive Elements: Role added for accessibility without changing div/CSS -->
+    <div id="menu-btn" role="button" aria-label="Toggle Settings Menu" tabindex="0"><span></span><span></span><span></span></div>
+
+    <aside id="settings-panel">
+        <h2>FLAME CONFIG</h2>
+
+        <div class="section-title">Geometry</div>
+        <div class="control-group">
+            <label for="inp-density">Billow Size (Lower is bigger)</label>
+            <input type="range" id="inp-density" min="0.2" max="3.0" step="0.1">
+        </div>
+        <div class="control-group">
+            <label for="inp-strength">Height/Intensity</label>
+            <input type="range" id="inp-strength" min="0" max="2.5" step="0.1">
+        </div>
+        <div class="control-group">
+            <label for="inp-warp">Warp (Base Shape)</label>
+            <input type="range" id="inp-warp" min="0.0" max="2.0" step="0.1">
+        </div>
+
+        <div class="section-title">Animation</div>
+        <div class="control-group">
+            <label for="inp-speed">Rise Speed</label>
+            <input type="range" id="inp-speed" min="0" max="3.0" step="0.1">
+        </div>
+
+        <div class="section-title">Lighting</div>
+        <div class="control-group">
+            <label for="inp-ambient">Ambient Light</label>
+            <input type="range" id="inp-ambient" min="0.0" max="1.5" step="0.1">
+        </div>
+        <div class="control-group">
+            <label for="inp-keyLight">Key Light (Front)</label>
+            <input type="range" id="inp-keyLight" min="0" max="2.0" step="0.1">
+        </div>
+        <div class="control-group">
+            <label for="inp-backLight">Back Light (Rim)</label>
+            <input type="range" id="inp-backLight" min="0" max="2.0" step="0.1">
+        </div>
+        
+        <div class="section-title">Fire Palette</div>
+        <div class="color-row">
+            <input type="color" id="inp-color1" aria-label="Fire Color 1">
+            <input type="color" id="inp-color2" aria-label="Fire Color 2">
+            <input type="color" id="inp-color3" aria-label="Fire Color 3">
+            <input type="color" id="inp-color4" aria-label="Fire Color 4">
+        </div>
+
+        <div style="flex-grow:1"></div>
+
+        <div class="btn-row">
+            <button class="full-width" id="btn-random">Randomize</button>
+            <button id="btn-reset">Reset</button>
+            <button id="btn-export">Save 4K</button>
+        </div>
+    </aside>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- Config State ---
+        // Defaults tuned for a "Fluid Fire" look
+        const config = {
+            density: 0.6,    // Lower density = larger, smoother billows (less spiky)
+            strength: 1.1,   // Higher displacement to stretch it out
+            warp: 0.5,
+            speed: 1.4,      // Faster rise
+            rotSpeed: 0.002,
+            
+            // Lighting Defaults
+            ambient: 0.3,    
+            keyLight: 1.0,   
+            backLight: 2.0,  // Strong rim for the "glow"
+            
+            // Fire Palette
+            color1: new THREE.Color('#000000'), // Core (Black/Void)
+            color2: new THREE.Color('#550000'), // Deep Red
+            color3: new THREE.Color('#ff4400'), // Bright Orange
+            color4: new THREE.Color('#ffcc00')  // Yellow/White Tips
+        };
+
+        // --- Shader: Half-Lambert Soft Lighting ---
+        const vert = `
+            uniform float uTime;
+            uniform float uStrength; // High frequency detail
+            uniform float uDensity;
+            uniform float uSpeed;
+            uniform float uWarp;    // Low frequency shape distortion
+
+            varying vec2 vUv;
+            varying vec3 vNormal;
+            varying vec3 vViewPos;
+            varying float vNoise;
+
+            // Simplex Noise
+            vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
+            vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
+            float snoise(vec3 v){ 
+                const vec2  C = vec2(1.0/6.0, 1.0/3.0) ;
+                const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
+                vec3 i  = floor(v + dot(v, C.yyy) );
+                vec3 x0 = v - i + dot(i, C.xxx) ;
+                vec3 g = step(x0.yzx, x0.xyz);
+                vec3 l = 1.0 - g;
+                vec3 i1 = min( g.xyz, l.zxy );
+                vec3 i2 = max( g.xyz, l.zxy );
+                vec3 x1 = x0 - i1 + 1.0 * C.xxx;
+                vec3 x2 = x0 - i2 + 2.0 * C.xxx;
+                vec3 x3 = x0 - 1.0 + 3.0 * C.xxx;
+                i = mod(i, 289.0 ); 
+                vec4 p = permute( permute( permute( 
+                            i.z + vec4(0.0, i1.z, i2.z, 1.0 ))
+                        + i.y + vec4(0.0, i1.y, i2.y, 1.0 )) 
+                        + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
+                float n_ = 1.0/7.0; 
+                vec3  ns = n_ * D.wyz - D.xzx;
+                vec4 j = p - 49.0 * floor(p * ns.z *ns.z); 
+                vec4 x_ = floor(j * ns.z);
+                vec4 y_ = floor(j - 7.0 * x_ ); 
+                vec4 x = x_ *ns.x + ns.yyyy;
+                vec4 y = y_ *ns.x + ns.yyyy;
+                vec4 h = 1.0 - abs(x) - abs(y);
+                vec4 b0 = vec4( x.xy, y.xy );
+                vec4 b1 = vec4( x.zw, y.zw );
+                vec4 s0 = floor(b0)*2.0 + 1.0;
+                vec4 s1 = floor(b1)*2.0 + 1.0;
+                vec4 sh = -step(h, vec4(0.0));
+                vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy ;
+                vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww ;
+                vec3 p0 = vec3(a0.xy,h.x);
+                vec3 p1 = vec3(a0.zw,h.y);
+                vec3 p2 = vec3(a1.xy,h.z);
+                vec3 p3 = vec3(a1.zw,h.w);
+                vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+                p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+                vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+                m = m * m;
+                return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3) ) );
+            }
+
+            void main() {
+                vUv = uv;
+                
+                // Base Normals
+                vec3 objectNormal = normalize(normal);
+
+                // --- FLUID FIRE LOGIC ---
+
+                // 1. Calculate a "Vertical Factor" (0.0 at bottom, 1.0 at top)
+                // Used to dampen movement at the base and exaggerate at the top
+                float vFactor = smoothstep(-1.0, 1.0, position.y);
+                
+                // 2. Base Warp (Low frequency)
+                // Move noise downwards so fire looks like it rises
+                vec3 warpPos = objectNormal * 0.4;
+                warpPos.y -= uTime * uSpeed * 0.3; 
+                float warpNoise = snoise(warpPos);
+                
+                // 3. Detail Noise (High frequency)
+                vec3 detailPos = objectNormal * uDensity;
+                detailPos.y -= uTime * uSpeed * 1.2; 
+                float detailNoise = snoise(detailPos);
+                vNoise = detailNoise; // Pass for color
+
+                // 4. Combine Forces
+                // We combine warp and detail, then multiply by vFactor
+                // This ensures the bottom stays relatively spherical/stable (the fuel source)
+                // while the top whips around wildly.
+                float combinedDisplacement = (warpNoise * uWarp) + (detailNoise * uStrength);
+                
+                // Attenuate the base (keep it stable)
+                combinedDisplacement *= (0.3 + 0.7 * vFactor); 
+
+                // 5. Apply Displacement
+                // Instead of just moving along the Normal (which makes puffy balls),
+                // we also add a bit of Upward movement (vec3(0,1,0)) based on the noise.
+                // This creates the "lick" effect.
+                vec3 newPos = position + (objectNormal * combinedDisplacement);
+                newPos.y += combinedDisplacement * 0.5; // Add vertical lift to the noise spikes
+                
+                // Recalc normals (Simple approximation)
+                vNormal = normalize(normalMatrix * objectNormal);
+                
+                vec4 mvPosition = modelViewMatrix * vec4(newPos, 1.0);
+                vViewPos = -mvPosition.xyz;
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `;
+
+        const frag = `
+            uniform vec3 uColor1;
+            uniform vec3 uColor2;
+            uniform vec3 uColor3;
+            uniform vec3 uColor4;
+            
+            uniform float uAmbient;  
+            uniform float uKeyLight;
+            uniform float uBackLight;
+
+            varying float vNoise;
+            varying vec3 vNormal;
+            varying vec3 vViewPos;
+
+            void main() {
+                // 1. Color (Albedo)
+                // Map noise -1..1 to 0..1
+                float dist = (vNoise + 1.0) * 0.5;
+                
+                vec3 albedo;
+                // Fire gradient logic
+                if (dist < 0.4) albedo = mix(uColor1, uColor2, dist * 2.5);
+                else if (dist < 0.7) albedo = mix(uColor2, uColor3, (dist - 0.4) * 3.33);
+                else albedo = mix(uColor3, uColor4, (dist - 0.7) * 3.33);
+
+                // 2. Vectors
+                vec3 N = normalize(vNormal);
+                vec3 V = normalize(vViewPos);
+                
+                // 3. Lighting
+                
+                // Key Light
+                vec3 keyDir = normalize(vec3(1.0, 1.0, 1.0));
+                float keyTerm = dot(N, keyDir) * 0.5 + 0.5; 
+                keyTerm = pow(keyTerm, 2.0); 
+                vec3 keyColor = vec3(1.0) * keyTerm * uKeyLight;
+
+                // Back Light (Rim) - Crucial for Fire Glow
+                vec3 backDir = normalize(vec3(-0.5, 0.2, -1.0));
+                float backTerm = max(dot(N, backDir), 0.0);
+                
+                // Fresnel / Rim
+                float rim = 1.0 - max(dot(N, V), 0.0);
+                rim = pow(rim, 3.0); 
+                
+                // Backlight is hot (Color 3)
+                vec3 backColor = uColor3 * (backTerm + rim) * uBackLight;
+
+                // Ambient (Fill)
+                vec3 ambientColor = albedo * 0.2 * uAmbient;
+
+                // 4. Combine
+                vec3 finalColor = (albedo * keyColor) + backColor + ambientColor;
+
+                gl_FragColor = vec4(finalColor, 1.0);
+            }
+        `;
+
+        // --- Scene ---
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.z = 6;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        // --- Object ---
+        const geo = new THREE.IcosahedronGeometry(1.4, 80); // Higher poly count for smooth curves
+        const mat = new THREE.ShaderMaterial({
+            vertexShader: vert,
+            fragmentShader: frag,
+            uniforms: {
+                uTime: { value: 0 },
+                uStrength: { value: config.strength },
+                uDensity: { value: config.density },
+                uWarp: { value: config.warp },
+                uSpeed: { value: config.speed },
+                uColor1: { value: config.color1 },
+                uColor2: { value: config.color2 },
+                uColor3: { value: config.color3 },
+                uColor4: { value: config.color4 },
+                uAmbient: { value: config.ambient },
+                uKeyLight: { value: config.keyLight },
+                uBackLight: { value: config.backLight }
+            }
+        });
+
+        const blob = new THREE.Mesh(geo, mat);
+        
+        // Stretch it vertically to help the flame look
+        blob.scale.set(1.0, 1.3, 1.0);
+        
+        scene.add(blob);
+
+        // --- Background Sync ---
+        const bgEl = document.getElementById('studio-backdrop');
+        function updateBg() {
+            const r = Math.floor(config.color2.r * 255); 
+            const g = Math.floor(config.color2.g * 255);
+            const b = Math.floor(config.color2.b * 255);
+            const opacity = 0.2 + (config.ambient * 0.4); 
+            bgEl.style.background = `radial-gradient(circle at 50% 60%, rgba(${r},${g},${b},${opacity}) 0%, #000000 80%)`;
+        }
+
+        // --- Loop ---
+        const clock = new THREE.Clock();
+        function loop() {
+            requestAnimationFrame(loop);
+            const t = clock.getElapsedTime();
+            
+            mat.uniforms.uTime.value = t;
+            blob.rotation.y = t * config.rotSpeed * 10.0;
+            // Wobble
+            blob.rotation.x = Math.sin(t * 0.5) * 0.1;
+
+            renderer.render(scene, camera);
+        }
+        loop();
+
+        // --- UI & Interactions ---
+        const ui = {
+            strength: 'inp-strength', density: 'inp-density', warp: 'inp-warp',
+            speed: 'inp-speed', ambient: 'inp-ambient', 
+            keyLight: 'inp-keyLight', backLight: 'inp-backLight'
+        };
+        const colors = { color1: 'inp-color1', color2: 'inp-color2', color3: 'inp-color3', color4: 'inp-color4' };
+
+        function updateUniforms() {
+            mat.uniforms.uStrength.value = config.strength;
+            mat.uniforms.uDensity.value = config.density;
+            mat.uniforms.uWarp.value = config.warp;
+            mat.uniforms.uSpeed.value = config.speed;
+            mat.uniforms.uAmbient.value = config.ambient;
+            mat.uniforms.uKeyLight.value = config.keyLight;
+            mat.uniforms.uBackLight.value = config.backLight;
+            
+            mat.uniforms.uColor1.value.copy(config.color1);
+            mat.uniforms.uColor2.value.copy(config.color2);
+            mat.uniforms.uColor3.value.copy(config.color3);
+            mat.uniforms.uColor4.value.copy(config.color4);
+            updateBg();
+        }
+
+        function sync() {
+            for(let k in ui) {
+                const el = document.getElementById(ui[k]);
+                if(el) el.value = config[k];
+            }
+            for(let k in colors) {
+                const el = document.getElementById(colors[k]);
+                if(el) el.value = '#' + config[k].getHexString();
+            }
+        }
+
+        // Listeners
+        for(let k in ui) {
+            document.getElementById(ui[k]).oninput = (e) => {
+                config[k] = parseFloat(e.target.value);
+                updateUniforms();
+            };
+        }
+        for(let k in colors) {
+            document.getElementById(colors[k]).oninput = (e) => {
+                config[k].set(e.target.value);
+                updateUniforms();
+            };
+        }
+
+        // Menu
+        const menuBtn = document.getElementById('menu-btn');
+        const panel = document.getElementById('settings-panel');
+        const overlay = document.getElementById('fade-overlay');
+        const clickTrig = document.getElementById('click-trigger');
+        let menuOpen = false;
+
+        function toggle() {
+            menuOpen = !menuOpen;
+            if(menuOpen) {
+                menuBtn.classList.add('open');
+                panel.classList.add('open');
+                clickTrig.style.pointerEvents = 'none';
+            } else {
+                menuBtn.classList.remove('open');
+                panel.classList.remove('open');
+                clickTrig.style.pointerEvents = 'auto';
+            }
+        }
+        menuBtn.onclick = toggle;
+        document.onkeydown = e => { if(e.key==='Escape' && menuOpen) toggle(); };
+
+        // Randomize
+        function randomize() {
+            overlay.style.opacity = 1;
+            setTimeout(() => {
+                config.strength = Math.random() * 1.5 + 0.5;
+                config.density = Math.random() * 1.0 + 0.3; // Keep density low for fire
+                config.warp = Math.random() * 1.0 + 0.2;
+                config.speed = Math.random() * 2.0 + 0.5;
+                
+                config.ambient = Math.random() * 0.8 + 0.2;
+                config.keyLight = Math.random() * 1.0 + 0.5;
+                config.backLight = Math.random() * 1.5 + 0.5;
+                
+                // Random but leaning towards high saturation for fire effect
+                config.color1.setHSL(Math.random(), 0.9, 0.1);
+                config.color2.setHSL(Math.random(), 0.9, 0.4);
+                config.color3.setHSL(Math.random(), 0.9, 0.5);
+                config.color4.setHSL(Math.random(), 1.0, 0.8);
+                
+                updateUniforms();
+                sync();
+                setTimeout(() => overlay.style.opacity = 0, 300);
+            }, 500);
+        }
+
+        document.getElementById('btn-random').onclick = randomize;
+        clickTrig.onclick = () => { if(!menuOpen) randomize(); };
+
+        // RESET TO FIRE
+        document.getElementById('btn-reset').onclick = () => {
+            overlay.style.opacity = 1;
+            setTimeout(() => {
+                config.density = 0.6;
+                config.strength = 1.1;
+                config.warp = 0.5;
+                config.speed = 1.4;
+                config.ambient=0.3; config.keyLight=1.0; config.backLight=2.0;
+                
+                config.color1.set('#000000'); 
+                config.color2.set('#550000');
+                config.color3.set('#ff4400'); 
+                config.color4.set('#ffcc00');
+                
+                updateUniforms(); sync();
+                setTimeout(() => overlay.style.opacity = 0, 300);
+            }, 500);
+        };
+
+        document.getElementById('btn-export').onclick = () => {
+            renderer.setSize(3840, 2160);
+            camera.aspect = 3840/2160;
+            camera.updateProjectionMatrix();
+            renderer.render(scene, camera);
+            const a = document.createElement('a');
+            a.download = 'blob-fire-4k.png';
+            a.href = renderer.domElement.toDataURL();
+            a.click();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth/window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.render(scene, camera);
+        };
+
+        window.onresize = () => {
+            camera.aspect = window.innerWidth/window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        };
+
+        // Start
+        setTimeout(() => { overlay.style.opacity = 0; sync(); updateBg(); }, 500);
+
+    </script>
+</body>
+</html>
